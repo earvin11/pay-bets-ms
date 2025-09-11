@@ -3,22 +3,25 @@ import { LoggerPort } from 'src/logging/domain/logger.port';
 import { RedisRpcPort } from 'src/redis/domain/redis-rpc.port';
 import { RpcChannels } from 'src/shared/enums/rpc-channels.enum';
 import {
+  BetAggregate,
   ChooseWinnersData,
   PayBetData,
 } from 'src/shared/interfaces/pay-bets.interfaces';
+import { WalletCreditPort } from '../domain/wallet-credit.port';
 
 @Injectable()
 export class PayBetsUseCase {
   constructor(
     private readonly loggerPort: LoggerPort,
     private readonly redisRpcPort: RedisRpcPort,
+    private readonly walletCreditPort: WalletCreditPort,
   ) {}
 
   async run(data: ChooseWinnersData[]) {
     for (const chooseData of data) {
       const { round, roulette } = chooseData;
 
-      const winnerBets: any[] = await this.redisRpcPort.send(
+      const winnerBets: BetAggregate[] = await this.redisRpcPort.send(
         RpcChannels.GET_WINNER_BETS,
         {
           round: round._id,
@@ -61,110 +64,110 @@ export class PayBetsUseCase {
     //     bet?.player.tokenWallet
     // );
 
-    // const objectWalletWin = {
-    //   user_id: data.userId,
-    //   round_id: round?.identifierNumber,
-    //   bet_id: bet?._id,
-    //   game_id: bet?.roulette,
-    //   bet_code: bet.transactionId,
-    //   bet_date: bet?.createdAt,
-    //   currency: data.currency,
+    const objectWalletWin = {
+      amount,
+      bet_code: bet.transactionId,
+      bet_date: String(bet.createdAt),
+      bet_id: bet._id,
+      currency: bet.player.currency,
+      game_id: bet.roulette,
+      platform: '',
+      round_id: String(round.identifierNumber),
+      transactionType: 'credit' as const,
+      user_id: bet.player.userId,
+    };
+
+    const url = bet?.operator[0].endpointWin;
+    const startTime = Date.now();
+    try {
+      const data = await this.walletCreditPort.credit(
+        bet.operator[0].endpointWin,
+        objectWalletWin,
+      );
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      this.loggerPort.log('Wallet credit success', {
+        ...objectWalletWin,
+        walletResponse: data,
+        duration,
+      });
+      if (!data.ok) {
+        const log = {
+          type: 'error',
+          response: {
+            ok: false,
+            wallet: data.msg ?? data.mensaje ?? 'error in wallet',
+            msg: `${data.msg}`,
+          },
+          request: {
+            ...objectWalletWin,
+            url,
+          },
+        };
+        this.loggerPort.log('Error send credit wallet', JSON.stringify(log));
+        return;
+      }
+    } catch (err) {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      this.loggerPort.log('Wallet credit error', {
+        request: {
+          ...objectWalletWin,
+          url,
+        },
+        duration,
+        err,
+      });
+      return;
+    }
+
+    // const player: any = await this.playerUseCases.findOneBy({
+    //   _id: bet.player._id,
+    // });
+    // const transactionData: TransactionEntity = {
+    //   bet,
+    //   round,
+    //   game: roulette,
+    //   player: player?.toJSON(),
+    //   playerIp: 'none',
+    //   userAgent: 'none',
+    //   playerCountry: 'VEN',
+    //   platform: 'desktop',
+    //   usersOnline: 0,
+    //   userBalance: Number(data.lastBalance) + amount,
+    //   walletRequest: objectWalletWin,
+    //   walletResponse,
+    //   type: 'credit',
     //   amount,
-    //   platform: '',
+    //   currencyExchangeDollar: bet.currencies[0].usdExchange,
+    //   amountExchangeDollar: amount * bet.currencies[0].usdExchange,
     // };
 
-    // const url = bet?.operator[0].endpointWin;
-    // let walletResponse = {};
-    // const startTime = Date.now();
-    // try {
-    //   const data = await this.walletPlayerUseCases.credit(url, {
-    //     ...objectWalletWin,
-    //   });
-
-    //   walletResponse = data;
-    //   const endTime = Date.now();
-    //   const duration = endTime - startTime;
-    //   this.loggerPort.log('Wallet credit success', {
-    //     ...objectWalletWin,
-    //     walletResponse: data,
-    //     duration,
-    //   });
-    //   if (!data.ok) {
-    //     const log = {
-    //       type: 'error',
-    //       response: {
-    //         ok: false,
-    //         wallet: data.msg ?? data.mensaje ?? 'error in wallet',
-    //         msg: `${data.msg}`,
-    //       },
-    //       request: {
-    //         ...objectWalletWin,
-    //         url,
-    //       },
-    //     };
-    //     this.loggerPort.log('Error send credit wallet', JSON.stringify(log));
-    //     return;
-    //   }
-    // } catch (err) {
-    //   const endTime = Date.now();
-    //   const duration = endTime - startTime;
-    //   this.loggerPort.log('Wallet credit error', {
-    //     request: {
-    //       ...objectWalletWin,
-    //       url,
-    //     },
-    //     duration,
-    //     err,
-    //   });
-    //   return;
-    // }
-
-    // // const player: any = await this.playerUseCases.findOneBy({
-    // //   _id: bet.player._id,
-    // // });
-    // // const transactionData: TransactionEntity = {
-    // //   bet,
-    // //   round,
-    // //   game: roulette,
-    // //   player: player?.toJSON(),
-    // //   playerIp: 'none',
-    // //   userAgent: 'none',
-    // //   playerCountry: 'VEN',
-    // //   platform: 'desktop',
-    // //   usersOnline: 0,
-    // //   userBalance: Number(data.lastBalance) + amount,
-    // //   walletRequest: objectWalletWin,
-    // //   walletResponse,
-    // //   type: 'credit',
-    // //   amount,
-    // //   currencyExchangeDollar: bet.currencies[0].usdExchange,
-    // //   amountExchangeDollar: amount * bet.currencies[0].usdExchange,
-    // // };
-
-    // try {
-    //   //   await this.betUseCases.update(bet._id!, {
-    //   //     isPaid: true,
-    //   //   });
-    //   //   const transaction =
-    //   //     await this.transactionUseCases.create(transactionData);
-    //   //   await this.profitUseCases.create(transaction);
-    // } catch (err) {
-    //   this.loggerPort.error(
-    //     'Error pay bet -> ',
-    //     JSON.stringify({
-    //       type: 'error',
-    //       response: {
-    //         ok: false,
-    //         msg: `${err.message}`,
-    //       },
-    //       request: {
-    //         ...objectWalletWin,
-    //         url,
-    //         transactionData,
-    //       },
-    //     }),
-    //   );
-    //   throw err;
-    // }
+    try {
+      //   await this.betUseCases.update(bet._id!, {
+      //     isPaid: true,
+      //   });
+      //   const transaction =
+      //     await this.transactionUseCases.create(transactionData);
+      //   await this.profitUseCases.create(transaction);
+    } catch (err) {
+      this.loggerPort.error(
+        'Error pay bet -> ',
+        JSON.stringify({
+          type: 'error',
+          response: {
+            ok: false,
+            msg: `${err.message}`,
+          },
+          request: {
+            ...objectWalletWin,
+            url,
+            // transactionData,
+          },
+        }),
+      );
+      throw err;
+    }
   }
 }
