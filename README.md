@@ -4,7 +4,7 @@
 
 ## Description
 
-Este servicio contiene un cascaron para futuros proyectos de servicios de SprintGamming.
+Este servicio contiene logica para pagar apuestas ganadoras de la plataforma SprintGamming.
 
 ## Project setup
 
