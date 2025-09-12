@@ -93,6 +93,37 @@ export class PayBetsUseCase {
         this.loggerPort.log('Error send credit wallet', JSON.stringify(log));
         return;
       }
+
+      const transactionData /*TransactionEntity*/ = {
+        bet,
+        round,
+        game: roulette,
+        player: {
+          _id: bet.player._id,
+          userId: bet.player.userId,
+          username: bet.player.username,
+          WL: bet.player.WL,
+          lastBalance: bet.player.lastBalance,
+          currency: bet.currency._id,
+        },
+        playerIp: 'none',
+        userAgent: 'none',
+        playerCountry: 'VEN',
+        platform: 'desktop',
+        usersOnline: 0,
+        userBalance: Number(bet.player.lastBalance) + amount,
+        walletRequest: objectWalletWin,
+        walletResponse: data,
+        type: 'credit',
+        amount,
+        currencyExchangeDollar: bet.currency.usdExchange,
+        amountExchangeDollar: amount * bet.currency.usdExchange,
+      };
+
+      await this.queuesPort.addJob(
+        QueueName.CREATE_CREDIT_TRANSACTION,
+        transactionData,
+      );
     } catch (err) {
       const endTime = Date.now();
       const duration = endTime - startTime;
@@ -106,37 +137,6 @@ export class PayBetsUseCase {
       });
       return;
     }
-
-    const transactionData /*TransactionEntity*/ = {
-      bet,
-      round,
-      game: roulette,
-      player: {
-        _id: bet.player._id,
-        userId: bet.player.userId,
-        username: bet.player.username,
-        WL: bet.player.WL,
-        lastBalance: bet.player.lastBalance,
-        currency: bet.currency._id,
-      },
-      playerIp: 'none',
-      userAgent: 'none',
-      playerCountry: 'VEN',
-      platform: 'desktop',
-      usersOnline: 0,
-      userBalance: Number(bet.player.lastBalance) + amount,
-      walletRequest: objectWalletWin,
-      // walletResponse: data,
-      type: 'credit',
-      amount,
-      currencyExchangeDollar: bet.currency.usdExchange,
-      amountExchangeDollar: amount * bet.currency.usdExchange,
-    };
-
-    await this.queuesPort.addJob(
-      QueueName.CREATE_CREDIT_TRANSACTION,
-      transactionData,
-    );
 
     // try {
     //   //   await this.betUseCases.update(bet._id!, {
