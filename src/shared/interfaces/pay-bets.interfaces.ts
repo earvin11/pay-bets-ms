@@ -1,8 +1,10 @@
+import { RouletteEntity, RoundEntity } from './utils.interfaces';
+
 export interface ChooseWinnersData {
-  round: any; //RoundEntity;
+  round: RoundEntity;
   result: number;
   doubleZero: boolean;
-  roulette: any; //RouletteEntity;
+  roulette: RouletteEntity;
 }
 
 export interface PayBetData extends ChooseWinnersData {

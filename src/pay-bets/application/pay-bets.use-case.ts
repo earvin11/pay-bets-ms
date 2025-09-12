@@ -23,13 +23,14 @@ export class PayBetsUseCase {
 
   async run(data: ChooseWinnersData[]) {
     for (const chooseData of data) {
-      const { round, roulette } = chooseData;
+      const { round } = chooseData;
 
       const winnerBets: BetWithPlayerData[] = await this.redisRpcPort.send(
         RpcChannels.GET_WINNER_BETS,
         {
           round: round._id,
           isWinner: true,
+          isPaid: false,
         },
       );
 
