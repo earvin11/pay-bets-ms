@@ -3,16 +3,20 @@ import { LoggerPort } from 'src/logging/domain/logger.port';
 import { RedisRpcPort } from 'src/redis/domain/redis-rpc.port';
 import { RpcChannels } from 'src/shared/enums/rpc-channels.enum';
 import {
-  BetAggregate,
+  BetWithPlayerData,
   ChooseWinnersData,
   PayBetData,
 } from 'src/shared/interfaces/pay-bets.interfaces';
 import { WalletCreditPort } from '../domain/wallet-credit.port';
+import { QueueService } from 'src/redis/infraestructure/implementations/queue.service';
+import { QueueName } from 'src/shared/enums/queue-names.enum';
+import { QueuesPort } from 'src/redis/domain/queues.port';
 
 @Injectable()
 export class PayBetsUseCase {
   constructor(
     private readonly loggerPort: LoggerPort,
+    private readonly queuesPort: QueuesPort,
     private readonly redisRpcPort: RedisRpcPort,
     private readonly walletCreditPort: WalletCreditPort,
   ) {}
@@ -21,7 +25,7 @@ export class PayBetsUseCase {
     for (const chooseData of data) {
       const { round, roulette } = chooseData;
 
-      const winnerBets: BetAggregate[] = await this.redisRpcPort.send(
+      const winnerBets: BetWithPlayerData[] = await this.redisRpcPort.send(
         RpcChannels.GET_WINNER_BETS,
         {
           round: round._id,
@@ -32,23 +36,10 @@ export class PayBetsUseCase {
       for (const bet of winnerBets) {
         await this.payBet({ ...chooseData, bet });
       }
-      // const winnerBets =
-      //     await this.betUseCases.findBetsWithPopulatedFields({
-      //         round: mongoose.Types.ObjectId(round._id),
-      //         isWinner: true,
-      //     });
-      // for (let bet of winnerBets) {
-      //     // await payBetQueue.add(QueueName.PAY_BET, {
-      //     //     ...chooseData,
-      //     //     bet,
-      //     // });
-      // }
 
       // const bankData = {
-      //     ...chooseData,
-      //     roulette,
-      //     round,
-      //     winnerBets,
+      //   ...chooseData,
+      //   winnerBets,
       // };
 
       // await calculateBankQueue.add(QueueName.CALCULATE_BANK, bankData);
@@ -59,17 +50,12 @@ export class PayBetsUseCase {
     const { bet, round, roulette } = dataWorker;
     const amount = bet.totalAmountPayoff;
 
-    // const data = await this.walletPlayerUseCases.auth(
-    //     bet?.operator[0].endpointAuth,
-    //     bet?.player.tokenWallet
-    // );
-
     const objectWalletWin = {
       amount,
       bet_code: bet.transactionId,
       bet_date: String(bet.createdAt),
       bet_id: bet._id,
-      currency: bet.player.currency,
+      currency: bet.currency.short,
       game_id: bet.roulette,
       platform: '',
       round_id: String(round.identifierNumber),
@@ -77,11 +63,10 @@ export class PayBetsUseCase {
       user_id: bet.player.userId,
     };
 
-    const url = bet?.operator[0].endpointWin;
     const startTime = Date.now();
     try {
       const data = await this.walletCreditPort.credit(
-        bet.operator[0].endpointWin,
+        bet.operator.endpointWin,
         objectWalletWin,
       );
 
@@ -102,7 +87,7 @@ export class PayBetsUseCase {
           },
           request: {
             ...objectWalletWin,
-            url,
+            url: bet.operator.endpointWin,
           },
         };
         this.loggerPort.log('Error send credit wallet', JSON.stringify(log));
@@ -114,7 +99,7 @@ export class PayBetsUseCase {
       this.loggerPort.log('Wallet credit error', {
         request: {
           ...objectWalletWin,
-          url,
+          url: bet.operator.endpointWin,
         },
         duration,
         err,
@@ -122,52 +107,61 @@ export class PayBetsUseCase {
       return;
     }
 
-    // const player: any = await this.playerUseCases.findOneBy({
-    //   _id: bet.player._id,
-    // });
-    // const transactionData: TransactionEntity = {
-    //   bet,
-    //   round,
-    //   game: roulette,
-    //   player: player?.toJSON(),
-    //   playerIp: 'none',
-    //   userAgent: 'none',
-    //   playerCountry: 'VEN',
-    //   platform: 'desktop',
-    //   usersOnline: 0,
-    //   userBalance: Number(data.lastBalance) + amount,
-    //   walletRequest: objectWalletWin,
-    //   walletResponse,
-    //   type: 'credit',
-    //   amount,
-    //   currencyExchangeDollar: bet.currencies[0].usdExchange,
-    //   amountExchangeDollar: amount * bet.currencies[0].usdExchange,
-    // };
+    const transactionData /*TransactionEntity*/ = {
+      bet,
+      round,
+      game: roulette,
+      player: {
+        _id: bet.player._id,
+        userId: bet.player.userId,
+        username: bet.player.username,
+        WL: bet.player.WL,
+        lastBalance: bet.player.lastBalance,
+        currency: bet.currency._id,
+      },
+      playerIp: 'none',
+      userAgent: 'none',
+      playerCountry: 'VEN',
+      platform: 'desktop',
+      usersOnline: 0,
+      userBalance: Number(bet.player.lastBalance) + amount,
+      walletRequest: objectWalletWin,
+      // walletResponse: data,
+      type: 'credit',
+      amount,
+      currencyExchangeDollar: bet.currency.usdExchange,
+      amountExchangeDollar: amount * bet.currency.usdExchange,
+    };
 
-    try {
-      //   await this.betUseCases.update(bet._id!, {
-      //     isPaid: true,
-      //   });
-      //   const transaction =
-      //     await this.transactionUseCases.create(transactionData);
-      //   await this.profitUseCases.create(transaction);
-    } catch (err) {
-      this.loggerPort.error(
-        'Error pay bet -> ',
-        JSON.stringify({
-          type: 'error',
-          response: {
-            ok: false,
-            msg: `${err.message}`,
-          },
-          request: {
-            ...objectWalletWin,
-            url,
-            // transactionData,
-          },
-        }),
-      );
-      throw err;
-    }
+    await this.queuesPort.addJob(
+      QueueName.CREATE_CREDIT_TRANSACTION,
+      transactionData,
+    );
+
+    // try {
+    //   //   await this.betUseCases.update(bet._id!, {
+    //   //     isPaid: true,
+    //   //   });
+    //   //   const transaction =
+    //   //     await this.transactionUseCases.create(transactionData);
+    //   //   await this.profitUseCases.create(transaction);
+    // } catch (err) {
+    //   this.loggerPort.error(
+    //     'Error pay bet -> ',
+    //     JSON.stringify({
+    //       type: 'error',
+    //       response: {
+    //         ok: false,
+    //         msg: `${err.message}`,
+    //       },
+    //       request: {
+    //         ...objectWalletWin,
+    //         url: bet.operator.endpointWin,
+    //         // transactionData,
+    //       },
+    //     }),
+    //   );
+    //   throw err;
+    // }
   }
 }
