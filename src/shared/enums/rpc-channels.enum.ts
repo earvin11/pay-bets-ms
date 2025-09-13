@@ -4,4 +4,5 @@ export enum RpcChannels {
   GET_WINNER_BETS = 'get-winner-bets',
   GET_PLAYER_BY_ID = 'get-player-by-id',
   GET_BETS_BY_AGGREGATE = 'get-bets-by-aggregate',
+  UPDATE_BET_WINNER = 'update-bet-winner',
 }

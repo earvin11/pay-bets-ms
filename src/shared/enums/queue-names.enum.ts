@@ -1,7 +1,7 @@
 export enum QueueName {
   //BETS
   BET = 'bet',
-  PAY_BETS = 'pay-bets',
+  PAY_BET = 'pay-bet',
   // ROUNDS
   ROUND_START = 'round-start',
   ROUND_END = 'round-end',
@@ -10,4 +10,6 @@ export enum QueueName {
   CALCULATE_JACKPOT = 'calculate-jackpot',
   //Transactions
   CREATE_CREDIT_TRANSACTION = 'create-credit-transaction',
+
+  CHOOSE_WINNERS = 'choose-winners',
 }

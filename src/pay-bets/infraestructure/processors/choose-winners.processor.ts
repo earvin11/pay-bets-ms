@@ -1,23 +1,25 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { LoggerPort } from 'src/logging/domain/logger.port';
-import { PayBetsUseCase } from 'src/pay-bets/application/pay-bets.use-case';
+import { ChooseWinnersUseCase } from 'src/pay-bets/application/choose-winners.use-case';
 import { QueueName } from 'src/shared/enums/queue-names.enum';
 
-@Processor(QueueName.PAY_BETS)
-export class PayBetsProcessor extends WorkerHost {
+@Processor(QueueName.CHOOSE_WINNERS)
+export class ChooseWinnerProcesor extends WorkerHost {
   constructor(
+    private readonly chooseWinnersUseCase: ChooseWinnersUseCase,
     private readonly loggerPort: LoggerPort,
-    private readonly payBetsUseCase: PayBetsUseCase,
   ) {
     super();
   }
-
   async process(job: Job, token?: string): Promise<any> {
     try {
-      return await this.payBetsUseCase.run(job.data);
+      return await this.chooseWinnersUseCase.run(job.data);
     } catch (error) {
-      this.loggerPort.error(`[ERROR] process: ${QueueName.PAY_BETS}`, error);
+      this.loggerPort.error(
+        `[ERROR] process: ${QueueName.CHOOSE_WINNERS}`,
+        error,
+      );
       throw error;
     }
   }

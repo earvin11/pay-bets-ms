@@ -1,53 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { LoggerPort } from 'src/logging/domain/logger.port';
-import { RedisRpcPort } from 'src/redis/domain/redis-rpc.port';
-import { RpcChannels } from 'src/shared/enums/rpc-channels.enum';
-import {
-  BetWithPlayerData,
-  ChooseWinnersData,
-  PayBetData,
-} from 'src/shared/interfaces/pay-bets.interfaces';
+import { PayBetData } from 'src/shared/interfaces/pay-bets.interfaces';
 import { WalletCreditPort } from '../domain/wallet-credit.port';
-import { QueueService } from 'src/redis/infraestructure/implementations/queue.service';
 import { QueueName } from 'src/shared/enums/queue-names.enum';
 import { QueuesPort } from 'src/redis/domain/queues.port';
 
 @Injectable()
-export class PayBetsUseCase {
+export class PayBetUseCase {
   constructor(
     private readonly loggerPort: LoggerPort,
     private readonly queuesPort: QueuesPort,
-    private readonly redisRpcPort: RedisRpcPort,
     private readonly walletCreditPort: WalletCreditPort,
   ) {}
 
-  async run(data: ChooseWinnersData[]) {
-    for (const chooseData of data) {
-      const { round } = chooseData;
-
-      const winnerBets: BetWithPlayerData[] = await this.redisRpcPort.send(
-        RpcChannels.GET_WINNER_BETS,
-        {
-          round: round._id,
-          isWinner: true,
-          isPaid: false,
-        },
-      );
-
-      for (const bet of winnerBets) {
-        await this.payBet({ ...chooseData, bet });
-      }
-
-      // const bankData = {
-      //   ...chooseData,
-      //   winnerBets,
-      // };
-
-      // await calculateBankQueue.add(QueueName.CALCULATE_BANK, bankData);
-    }
-  }
-
-  private async payBet(dataWorker: PayBetData) {
+  public async run(dataWorker: PayBetData) {
     const { bet, round, roulette } = dataWorker;
     const amount = bet.totalAmountPayoff;
 
