@@ -33,7 +33,7 @@ export class ChooseWinnersUseCase {
           isPaid: false,
           openPay: false,
           round: choseData.round._id,
-          $or: winnerFilters,
+          winnerFilters,
         },
       );
 
@@ -62,6 +62,7 @@ export class ChooseWinnersUseCase {
 
         try {
           await this.redisRpcPort.send(RpcChannels.UPDATE_BET_WINNER, {
+            betId: bet._id,
             isWinner: true,
             totalAmountPayoff: totalEarnings,
           });
@@ -80,7 +81,7 @@ export class ChooseWinnersUseCase {
       const { round } = chooseData;
 
       const winnerBets: BetWithPlayerData[] = await this.redisRpcPort.send(
-        RpcChannels.GET_WINNER_BETS,
+        RpcChannels.GET_BETS_WITH_DATA_PLAYER,
         {
           round: round._id,
           isWinner: true,
