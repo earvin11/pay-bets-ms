@@ -28,7 +28,7 @@ export class ChooseWinnersUseCase {
         : this.betAmountWinnerUseCases.winnersFilter(choseData.round.result);
 
       const betsWinner: BetEntity[] = await this.redisRpcPort.send(
-        RpcChannels.GET_BETS_WITH_PLAYER_DATA,
+        RpcChannels.GET_BETS_BY_AGGREGATE,
         {
           isPaid: false,
           openPay: false,
