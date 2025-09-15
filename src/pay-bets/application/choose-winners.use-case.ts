@@ -10,6 +10,7 @@ import { BetEntity } from 'src/shared/interfaces/utils.interfaces';
 import { LoggerPort } from 'src/logging/domain/logger.port';
 import { QueuesPort } from 'src/redis/domain/queues.port';
 import { QueueName } from 'src/shared/enums/queue-names.enum';
+import { envs } from 'src/config/envs';
 
 @Injectable()
 export class ChooseWinnersUseCase {
@@ -20,6 +21,7 @@ export class ChooseWinnersUseCase {
     private readonly redisRpcPort: RedisRpcPort,
   ) {}
   async run(data: ChooseWinnersData[]) {
+    const startTime = Date.now();
     for (const choseData of data) {
       const winnerFilters = choseData.roulette.doubleZero
         ? this.betAmountWinnerUseCases.winnersFilterRouletteAmerican(
@@ -75,6 +77,12 @@ export class ChooseWinnersUseCase {
         }
       }
     }
+
+    await this.sendBetsToQueue(data);
+    this.loggerPort.log(`[${ envs.seqWorkSpace }]: chooseWinners`, {
+      data,
+      duration: Date.now() - startTime,
+    });
   }
   private async sendBetsToQueue(data: ChooseWinnersData[]) {
     for (const chooseData of data) {
